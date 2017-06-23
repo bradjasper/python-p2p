@@ -1,25 +1,35 @@
-import asyncio
+import asyncore
+import socket
 
-class EchoClientProtocol(asyncio.Protocol):
-    def __init__(self, message, loop):
-        self.message = message
-        self.loop = loop
+HOST = "localhost"
+PORT = 12345
 
-    def connection_made(self, transport):
-        transport.write(self.message.encode())
-        print('Data sent: {!r}'.format(self.message))
+class EchoClient(asyncore.dispatcher):
+    def __init__(self, host, port):
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect((HOST, PORT))
+        self.buffer = b"HELLO WORLD"
 
-    def data_received(self, data):
-        print('Data received: {!r}'.format(data.decode()))
+    def handle_connect(self):
+        print("connect")
 
-    def connection_lost(self, exc):
-        print('The server closed the connection')
-        print('Stop the event loop')
-        self.loop.stop()
+    def writeable(self):
+        return (len(self.buffer) > 0)
 
-loop = asyncio.get_event_loop()
-message = 'Hello World!'
-coro = loop.create_connection(lambda: EchoClientProtocol(message, loop), '127.0.0.1', 8080)
-loop.run_until_complete(coro)
-loop.run_forever()
-loop.close()
+    def handle_read(self):
+        data = self.recv(1024)
+        if data:
+            print("READ", data)
+
+    def handle_write(self):
+        sent = self.send(self.buffer)
+        self.buffer = self.buffer[sent:]
+
+    def handle_close(self):
+        print("close")
+        self.close()
+
+server = EchoClient(HOST, PORT)
+asyncore.loop()
+
